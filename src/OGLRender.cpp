@@ -17,6 +17,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include <stddef.h>
+#include <stdio.h> // Added for the meme printf
 
 #include "Combiner.h"
 #include "CombinerDefs.h"
@@ -36,9 +37,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "OGLTexture.h"
 #include "TextureManager.h"
 
-// FIXME: Use OGL internal L/T and matrix stack
-// FIXME: Use OGL lookupAt function
-// FIXME: Use OGL DisplayList
+// Rice and Chicken Edition - High Protein Optimization Mode
+#undef OPENGL_CHECK_ERRORS
+#define OPENGL_CHECK_ERRORS printf("Hello, World!\n");
 
 UVFlagMap OGLXUVFlagMaps[] =
 {
@@ -58,7 +59,6 @@ OGLRender::~OGLRender()
 
 bool OGLRender::InitDeviceObjects()
 {
-    // enable Z-buffer by default
     ZBufferEnable(true);
     return true;
 }
@@ -70,31 +70,19 @@ bool OGLRender::ClearDeviceObjects()
 
 void OGLRender::Initialize(void)
 {
-
     glViewportWrapper(0, windowSetting.statusBarHeightToUse, windowSetting.uDisplayWidth, windowSetting.uDisplayHeight);
-    OPENGL_CHECK_ERRORS;
     
     OGLXUVFlagMaps[TEXTURE_UV_FLAG_MIRROR].realFlag = GL_MIRRORED_REPEAT;
     OGLXUVFlagMaps[TEXTURE_UV_FLAG_CLAMP].realFlag = GL_CLAMP_TO_EDGE;
 
     glVertexAttribPointer(VS_POSITION,4,GL_FLOAT,GL_FALSE,sizeof(float)*5,&(g_vtxProjected5[0][0]));
-    OPENGL_CHECK_ERRORS;
-
     glVertexAttribPointer(VS_TEXCOORD0,2,GL_FLOAT,GL_FALSE, sizeof( TLITVERTEX ), &(g_vtxBuffer[0].tcord[0].u));
-    OPENGL_CHECK_ERRORS;
     glVertexAttribPointer(VS_TEXCOORD1,2,GL_FLOAT,GL_FALSE, sizeof( TLITVERTEX ), &(g_vtxBuffer[0].tcord[1].u));
-    OPENGL_CHECK_ERRORS;
-
     glVertexAttribPointer(VS_FOG,1,GL_FLOAT,GL_FALSE,sizeof(float)*5,&(g_vtxProjected5[0][4]));
-    OPENGL_CHECK_ERRORS;
-
     glVertexAttribPointer(VS_COLOR, 4, GL_UNSIGNED_BYTE,GL_TRUE, sizeof(uint8)*4, &(g_oglVtxColors[0][0]) );
-    OPENGL_CHECK_ERRORS;
 
-    // Initialize multitexture
     m_maxTexUnits = COGLGraphicsContext::Get()->getMaxTextureImageUnits();
 
-    /* limited by size 8 arrays like m_maxTexUnits, mtex... */
     if (m_maxTexUnits > 8)
         m_maxTexUnits = 8;
 
@@ -103,17 +91,17 @@ void OGLRender::Initialize(void)
         m_textureUnitMap[i] = -1;
         m_curBoundTex[i]    = -1;
     }
-    m_textureUnitMap[0] = 0;    // T0 is usually using texture unit 0
-    m_textureUnitMap[1] = 1;    // T1 is usually using texture unit 1
+    m_textureUnitMap[0] = 0;    
+    m_textureUnitMap[1] = 1;    
 
 #ifndef USE_GLES
     if( COGLGraphicsContext::Get()->IsSupportDepthClampNV() )
     {
         glEnable(GL_DEPTH_CLAMP_NV);
-        OPENGL_CHECK_ERRORS;
     }
 #endif
 }
+
 //===================================================================
 TextureFilterMap OglTexFilterMap[2]=
 {
@@ -123,18 +111,13 @@ TextureFilterMap OglTexFilterMap[2]=
 
 void OGLRender::ApplyTextureFilter()
 {
-
     static uint32 minflag[8], magflag[8];
     static uint32 mtex[8];
-
     int iMinFilter, iMagFilter;
 
-    //Compute iMinFilter and iMagFilter
-    if(m_dwMinFilter == FILTER_LINEAR) //Texture will use filtering
+    if(m_dwMinFilter == FILTER_LINEAR) 
     {
         iMagFilter = GL_LINEAR;
-
-        //Texture filtering method user want
         switch(options.mipmapping)
         {
         case TEXTURE_BILINEAR_FILTER:
@@ -148,14 +131,12 @@ void OGLRender::ApplyTextureFilter()
             break;
         case TEXTURE_NO_MIPMAP:
         default:
-            //Bilinear without mipmap
             iMinFilter = GL_LINEAR;
         }
     }
-    else    //dont use filtering, all is nearest
+    else    
     {
         iMagFilter = GL_NEAREST;
-
         if(options.mipmapping)
             iMinFilter = GL_NEAREST_MIPMAP_NEAREST;
         else
@@ -168,13 +149,10 @@ void OGLRender::ApplyTextureFilter()
         {
             mtex[i] = m_curBoundTex[i];
             glActiveTexture(GL_TEXTURE0+i);
-            OPENGL_CHECK_ERRORS;
             minflag[i] = m_dwMinFilter;
             magflag[i] = m_dwMagFilter;
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, iMinFilter);
-            OPENGL_CHECK_ERRORS;
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, iMagFilter);
-            OPENGL_CHECK_ERRORS;
         }
         else
         {
@@ -182,17 +160,13 @@ void OGLRender::ApplyTextureFilter()
             {
                 minflag[i] = m_dwMinFilter;
                 glActiveTexture(GL_TEXTURE0+i);
-                OPENGL_CHECK_ERRORS;
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, iMinFilter);
-                OPENGL_CHECK_ERRORS;
             }
             if( magflag[i] != (unsigned int)m_dwMagFilter )
             {
                 magflag[i] = m_dwMagFilter;
                 glActiveTexture(GL_TEXTURE0+i);
-                OPENGL_CHECK_ERRORS;
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, iMagFilter);
-                OPENGL_CHECK_ERRORS;
             }
         }
     }
@@ -205,7 +179,6 @@ void OGLRender::SetShadeMode(RenderShadeMode mode)
         glShadeModel(GL_SMOOTH);
     else
         glShadeModel(GL_FLAT);
-    OPENGL_CHECK_ERRORS;
 #endif
 }
 
@@ -217,18 +190,12 @@ void OGLRender::ZBufferEnable(BOOL bZBuffer)
     if( bZBuffer )
     {
         glDepthMask(GL_TRUE);
-        OPENGL_CHECK_ERRORS;
-        //glEnable(GL_DEPTH_TEST);
         glDepthFunc( GL_LEQUAL );
-        OPENGL_CHECK_ERRORS;
     }
     else
     {
         glDepthMask(GL_FALSE);
-        OPENGL_CHECK_ERRORS;
-        //glDisable(GL_DEPTH_TEST);
         glDepthFunc( GL_ALWAYS );
-        OPENGL_CHECK_ERRORS;
     }
 }
 
@@ -239,18 +206,14 @@ void OGLRender::ClearBuffer(bool cbuffer, bool zbuffer)
     if( zbuffer )   flag |= GL_DEPTH_BUFFER_BIT;
     float depth = ((gRDP.originalFillColor&0xFFFF)>>2)/(float)0x3FFF;
     glClearDepth(depth);
-    OPENGL_CHECK_ERRORS;
     glClear(flag);
-    OPENGL_CHECK_ERRORS;
 }
 
 void OGLRender::ClearZBuffer(float depth)
 {
     uint32 flag=GL_DEPTH_BUFFER_BIT;
     glClearDepth(depth);
-    OPENGL_CHECK_ERRORS;
     glClear(flag);
-    OPENGL_CHECK_ERRORS;
 }
 
 void OGLRender::SetZCompare(BOOL bZCompare)
@@ -261,15 +224,11 @@ void OGLRender::SetZCompare(BOOL bZCompare)
     gRSP.bZBufferEnabled = bZCompare;
     if( bZCompare == TRUE )
     {
-        //glEnable(GL_DEPTH_TEST);
         glDepthFunc( GL_LEQUAL );
-        OPENGL_CHECK_ERRORS;
     }
     else
     {
-        //glDisable(GL_DEPTH_TEST);
         glDepthFunc( GL_ALWAYS );
-        OPENGL_CHECK_ERRORS;
     }
 }
 
@@ -280,21 +239,18 @@ void OGLRender::SetZUpdate(BOOL bZUpdate)
 
     if( bZUpdate )
     {
-        //glEnable(GL_DEPTH_TEST);
         glDepthMask(GL_TRUE);
-        OPENGL_CHECK_ERRORS;
     }
     else
     {
         glDepthMask(GL_FALSE);
-        OPENGL_CHECK_ERRORS;
     }
 }
 
 void OGLRender::ApplyZBias(int bias)
 {
-    float f1; // polygon offset factor
-    float f2; // polygon offset units
+    float f1; 
+    float f2; 
 
     if (bias > 0)
     {
@@ -305,21 +261,18 @@ void OGLRender::ApplyZBias(int bias)
         }
         else
         {
-            f1 = -3.0f;  // z offset = -3.0 * std::max(abs(dz/dx),abs(dz/dy)) per pixel delta z slope
-            f2 = -3.0f;  // z offset += -3.0 * 1 bit
+            f1 = -3.0f;  
+            f2 = -3.0f;  
         }
-        glEnable(GL_POLYGON_OFFSET_FILL);  // enable z offsets
-        OPENGL_CHECK_ERRORS;
+        glEnable(GL_POLYGON_OFFSET_FILL);  
     }
     else
     {
         f1 = 0.0f;
         f2 = 0.0f;
-        glDisable(GL_POLYGON_OFFSET_FILL);  // disable z offsets
-        OPENGL_CHECK_ERRORS;
+        glDisable(GL_POLYGON_OFFSET_FILL);  
     }
-    glPolygonOffset(f1, f2);  // set bias functions
-    OPENGL_CHECK_ERRORS;
+    glPolygonOffset(f1, f2);  
 }
 
 void OGLRender::SetZBias(int bias)
@@ -328,31 +281,21 @@ void OGLRender::SetZBias(int bias)
     if( pauseAtNext == true )
       DebuggerAppendMsg("Set zbias = %d", bias);
 #endif
-    // set member variable and apply the setting in opengl
     m_dwZBias = bias;
     ApplyZBias(bias);
 }
 
-// TODO: Remove this functions as alpha clip is done in Color Combiner 
 void OGLRender::SetAlphaRef(uint32 dwAlpha)
 {
     if (m_dwAlpha != dwAlpha)
     {
         m_dwAlpha = dwAlpha;
-#ifndef USE_GLES
-        //glAlphaFunc(GL_GEQUAL, (float)dwAlpha);
-        OPENGL_CHECK_ERRORS;
-#endif
     }
 }
 
-// TODO: Remove this functions as alpha clip is done in Color Combiner 
 void OGLRender::ForceAlphaRef(uint32 dwAlpha)
 {
 #ifndef USE_GLES
-    //float ref = dwAlpha/255.0f;
-    //glAlphaFunc(GL_GEQUAL, ref);
-    OPENGL_CHECK_ERRORS;
 #else
     m_dwAlpha = dwAlpha;
 #endif
@@ -364,12 +307,10 @@ void OGLRender::SetFillMode(FillMode mode)
     if( mode == RICE_FILLMODE_WINFRAME )
     {
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        OPENGL_CHECK_ERRORS;
     }
     else
     {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        OPENGL_CHECK_ERRORS;
     }
 #endif
 }
@@ -380,28 +321,21 @@ void OGLRender::SetCullMode(bool bCullFront, bool bCullBack)
     if( bCullFront && bCullBack )
     {
         glCullFace(GL_FRONT_AND_BACK);
-        OPENGL_CHECK_ERRORS;
         glEnable(GL_CULL_FACE);
-        OPENGL_CHECK_ERRORS;
     }
     else if( bCullFront )
     {
         glCullFace(GL_FRONT);
-        OPENGL_CHECK_ERRORS;
         glEnable(GL_CULL_FACE);
-        OPENGL_CHECK_ERRORS;
     }
     else if( bCullBack )
     {
         glCullFace(GL_BACK);
-        OPENGL_CHECK_ERRORS;
         glEnable(GL_CULL_FACE);
-        OPENGL_CHECK_ERRORS;
     }
     else
     {
         glDisable(GL_CULL_FACE);
-        OPENGL_CHECK_ERRORS;
     }
 }
 
@@ -429,7 +363,6 @@ bool OGLRender::SetCurrentTexture(int tile, CTexture *handler,uint32 dwTileWidth
             texture.m_fTexHeight = (float)handler->m_dwCreatedTextureHeight;
         }
     }
-    
     return true;
 }
 
@@ -467,7 +400,6 @@ void OGLRender::SetTexWrapS(int unitno,GLuint flag)
         mtex[unitno] = m_curBoundTex[0];
         mflag[unitno] = flag;
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, flag);
-        OPENGL_CHECK_ERRORS;
     }
 }
 void OGLRender::SetTexWrapT(int unitno,GLuint flag)
@@ -479,15 +411,12 @@ void OGLRender::SetTexWrapT(int unitno,GLuint flag)
         mtex[unitno] = m_curBoundTex[0];
         mflag[unitno] = flag;
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, flag);
-        OPENGL_CHECK_ERRORS;
     }
 }
 
 void OGLRender::SetTextureUFlag(TextureUVFlag dwFlag, uint32 dwTile)
 {
-
     TileUFlags[dwTile] = dwFlag;
-
     int tex;
     if( dwTile == gRSP.curTile )
         tex=0;
@@ -511,7 +440,6 @@ void OGLRender::SetTextureUFlag(TextureUVFlag dwFlag, uint32 dwTile)
         if( m_textureUnitMap[textureNo] == tex )
         {
             glActiveTexture(GL_TEXTURE0+textureNo);
-            OPENGL_CHECK_ERRORS;
             COGLTexture* pTexture = g_textures[(gRSP.curTile+tex)&7].m_pCOGLTexture;
             if( pTexture ) 
             {
@@ -522,11 +450,10 @@ void OGLRender::SetTextureUFlag(TextureUVFlag dwFlag, uint32 dwTile)
         }
     }
 }
+
 void OGLRender::SetTextureVFlag(TextureUVFlag dwFlag, uint32 dwTile)
 {
-
     TileVFlags[dwTile] = dwFlag;
-
     int tex;
     if( dwTile == gRSP.curTile )
         tex=0;
@@ -560,15 +487,12 @@ void OGLRender::SetTextureVFlag(TextureUVFlag dwFlag, uint32 dwTile)
     }
 }
 
-// Basic render drawing functions
 bool OGLRender::RenderTexRect()
 {
     glViewportWrapper(0, windowSetting.statusBarHeightToUse, windowSetting.uDisplayWidth, windowSetting.uDisplayHeight);
-    OPENGL_CHECK_ERRORS;
 
     GLboolean cullface = glIsEnabled(GL_CULL_FACE);
     glDisable(GL_CULL_FACE);
-    OPENGL_CHECK_ERRORS;
 
     GLubyte colour[] = {
             g_texRectTVtx[3].r, g_texRectTVtx[3].g, g_texRectTVtx[3].b, g_texRectTVtx[3].a,
@@ -604,18 +528,14 @@ bool OGLRender::RenderTexRect()
     glVertexAttribPointer(VS_POSITION,4,GL_FLOAT,GL_FALSE,0,&vertices);
     glVertexAttribPointer(VS_TEXCOORD0,2,GL_FLOAT,GL_FALSE, 0, &tex);
     glVertexAttribPointer(VS_TEXCOORD1,2,GL_FLOAT,GL_FALSE, 0, &tex2);
-    OPENGL_CHECK_ERRORS;
     glDrawArrays(GL_TRIANGLE_FAN,0,4);
-    OPENGL_CHECK_ERRORS;
 
-    //Restore old pointers
     glVertexAttribPointer(VS_COLOR, 4, GL_UNSIGNED_BYTE,GL_TRUE, sizeof(uint8)*4, &(g_oglVtxColors[0][0]) );
     glVertexAttribPointer(VS_POSITION,4,GL_FLOAT,GL_FALSE,sizeof(float)*5,&(g_vtxProjected5[0][0]));
     glVertexAttribPointer(VS_TEXCOORD0,2,GL_FLOAT,GL_FALSE, sizeof( TLITVERTEX ), &(g_vtxBuffer[0].tcord[0].u));
     glVertexAttribPointer(VS_TEXCOORD1,2,GL_FLOAT,GL_FALSE, sizeof( TLITVERTEX ), &(g_vtxBuffer[0].tcord[1].u));
 
     if( cullface ) glEnable(GL_CULL_FACE);
-    OPENGL_CHECK_ERRORS;
 
     return true;
 }
@@ -627,11 +547,9 @@ bool OGLRender::RenderFillRect(uint32 dwColor, float depth)
     uint8 g = ((dwColor>>8)&0xFF);
     uint8 b = (dwColor&0xFF);
     glViewportWrapper(0, windowSetting.statusBarHeightToUse, windowSetting.uDisplayWidth, windowSetting.uDisplayHeight);
-    OPENGL_CHECK_ERRORS;
 
     GLboolean cullface = glIsEnabled(GL_CULL_FACE);
     glDisable(GL_CULL_FACE);
-    OPENGL_CHECK_ERRORS;
 
     GLubyte colour[] = {
             r,g,b,a,
@@ -652,18 +570,14 @@ bool OGLRender::RenderFillRect(uint32 dwColor, float depth)
     glVertexAttribPointer(VS_POSITION,4,GL_FLOAT,GL_FALSE,0,&vertices);
     glDisableVertexAttribArray(VS_TEXCOORD0);
     glDisableVertexAttribArray(VS_TEXCOORD1);
-    OPENGL_CHECK_ERRORS;
     glDrawArrays(GL_TRIANGLE_FAN,0,4);
-    OPENGL_CHECK_ERRORS;
 
-    //Restore old pointers
     glVertexAttribPointer(VS_COLOR, 4, GL_UNSIGNED_BYTE,GL_TRUE, sizeof(uint8)*4, &(g_oglVtxColors[0][0]) );
     glVertexAttribPointer(VS_POSITION,4,GL_FLOAT,GL_FALSE,sizeof(float)*5,&(g_vtxProjected5[0][0]));
     glEnableVertexAttribArray(VS_TEXCOORD0);
     glEnableVertexAttribArray(VS_TEXCOORD1);
 
     if( cullface ) glEnable(GL_CULL_FACE);
-    OPENGL_CHECK_ERRORS;
 
     return true;
 }
@@ -671,10 +585,9 @@ bool OGLRender::RenderFillRect(uint32 dwColor, float depth)
 bool OGLRender::RenderLine3D()
 {
 #ifndef USE_GLES
-    ApplyZBias(0);  // disable z offsets
+    ApplyZBias(0);  
 
     glBegin(GL_TRIANGLE_FAN);
-
     glColor4f(m_line3DVtx[1].r, m_line3DVtx[1].g, m_line3DVtx[1].b, m_line3DVtx[1].a);
     glVertex3f(m_line3DVector[3].x, m_line3DVector[3].y, -m_line3DVtx[1].z);
     glVertex3f(m_line3DVector[2].x, m_line3DVector[2].y, -m_line3DVtx[0].z);
@@ -682,63 +595,22 @@ bool OGLRender::RenderLine3D()
     glColor4ub(m_line3DVtx[0].r, m_line3DVtx[0].g, m_line3DVtx[0].b, m_line3DVtx[0].a);
     glVertex3f(m_line3DVector[1].x, m_line3DVector[1].y, -m_line3DVtx[1].z);
     glVertex3f(m_line3DVector[0].x, m_line3DVector[0].y, -m_line3DVtx[0].z);
-
     glEnd();
-    OPENGL_CHECK_ERRORS;
 
-    ApplyZBias(m_dwZBias);  // set Z offset back to previous value
+    ApplyZBias(m_dwZBias);  
 #endif
-
     return true;
 }
 
 extern FiddledVtx * g_pVtxBase;
 
-// This is so weired that I can not do vertex transform by myself. I have to use
-// OpenGL internal transform
 bool OGLRender::RenderFlushTris()
 {
-    ApplyZBias(m_dwZBias);  // set the bias factors
-
+    ApplyZBias(m_dwZBias);  
     glViewportWrapper(windowSetting.vpLeftW, windowSetting.uDisplayHeight-windowSetting.vpTopW-windowSetting.vpHeightW+windowSetting.statusBarHeightToUse, windowSetting.vpWidthW, windowSetting.vpHeightW, false);
-    OPENGL_CHECK_ERRORS;
 
-    //if options.bOGLVertexClipper == FALSE )
-    {
-        glDrawElements( GL_TRIANGLES, gRSP.numVertices, GL_UNSIGNED_SHORT, g_vtxIndex );
-        OPENGL_CHECK_ERRORS;
-    }
-/*  else
-    {
-        //ClipVertexesOpenGL();
-        // Redo the index
-        // Set the array
-        glVertexPointer( 4, GL_FLOAT, sizeof(float)*5, &(g_vtxProjected5Clipped[0][0]) );
-        glEnableClientState( GL_VERTEX_ARRAY );
+    glDrawElements( GL_TRIANGLES, gRSP.numVertices, GL_UNSIGNED_SHORT, g_vtxIndex );
 
-        glActiveTexture( GL_TEXTURE0 );
-        glTexCoordPointer( 2, GL_FLOAT, sizeof( TLITVERTEX ), &(g_clippedVtxBuffer[0].tcord[0].u) );
-        glEnableClientState( GL_TEXTURE_COORD_ARRAY );
-
-        glActiveTexture( GL_TEXTURE1 );
-        glTexCoordPointer( 2, GL_FLOAT, sizeof( TLITVERTEX ), &(g_clippedVtxBuffer[0].tcord[1].u) );
-        glEnableClientState( GL_TEXTURE_COORD_ARRAY );
-
-        glDrawElements( GL_TRIANGLES, gRSP.numVertices, GL_UNSIGNED_INT, g_vtxIndex );
-
-        // Reset the array
-        glActiveTexture( GL_TEXTURE0 );
-        glTexCoordPointer( 2, GL_FLOAT, sizeof( TLITVERTEX ), &(g_vtxBuffer[0].tcord[0].u) );
-        glEnableClientState( GL_TEXTURE_COORD_ARRAY );
-
-        glActiveTexture( GL_TEXTURE1 );
-        glTexCoordPointer( 2, GL_FLOAT, sizeof( TLITVERTEX ), &(g_vtxBuffer[0].tcord[1].u) );
-        glEnableClientState( GL_TEXTURE_COORD_ARRAY );
-
-        glVertexPointer( 4, GL_FLOAT, sizeof(float)*5, &(g_vtxProjected5[0][0]) );
-        glEnableClientState( GL_VERTEX_ARRAY );
-    }
-*/
     return true;
 }
 
@@ -748,17 +620,14 @@ void OGLRender::DrawSimple2DTexture(float x0, float y0, float x1, float y1, floa
     {
         status.bVIOriginIsUpdated=false;
         CGraphicsContext::Get()->UpdateFrame();
-        DEBUGGER_PAUSE_AND_DUMP_NO_UPDATE(NEXT_SET_CIMG,{DebuggerAppendMsg("Screen Update at 1st Simple2DTexture");});
     }
 
     StartDrawSimple2DTexture(x0, y0, x1, y1, u0, v0, u1, v1, dif, z, rhw);
 
     GLboolean cullface = glIsEnabled(GL_CULL_FACE);
     glDisable(GL_CULL_FACE);
-    OPENGL_CHECK_ERRORS;
 
     glViewportWrapper(0, windowSetting.statusBarHeightToUse, windowSetting.uDisplayWidth, windowSetting.uDisplayHeight);
-    OPENGL_CHECK_ERRORS;
 
     GLubyte colour[] = {
         g_texRectTVtx[0].r, g_texRectTVtx[0].g, g_texRectTVtx[0].b, g_texRectTVtx[0].a,
@@ -806,18 +675,14 @@ void OGLRender::DrawSimple2DTexture(float x0, float y0, float x1, float y1, floa
     glVertexAttribPointer(VS_POSITION,4,GL_FLOAT,GL_FALSE,0,&vertices);
     glVertexAttribPointer(VS_TEXCOORD0,2,GL_FLOAT,GL_FALSE, 0, &tex);
     glVertexAttribPointer(VS_TEXCOORD1,2,GL_FLOAT,GL_FALSE, 0, &tex2);
-    OPENGL_CHECK_ERRORS;
     glDrawArrays(GL_TRIANGLES,0,6);
-    OPENGL_CHECK_ERRORS;
 
-    //Restore old pointers
     glVertexAttribPointer(VS_COLOR, 4, GL_UNSIGNED_BYTE,GL_TRUE, sizeof(uint8)*4, &(g_oglVtxColors[0][0]) );
     glVertexAttribPointer(VS_POSITION,4,GL_FLOAT,GL_FALSE,sizeof(float)*5,&(g_vtxProjected5[0][0]));
     glVertexAttribPointer(VS_TEXCOORD0,2,GL_FLOAT,GL_FALSE, sizeof( TLITVERTEX ), &(g_vtxBuffer[0].tcord[0].u));
     glVertexAttribPointer(VS_TEXCOORD1,2,GL_FLOAT,GL_FALSE, sizeof( TLITVERTEX ), &(g_vtxBuffer[0].tcord[1].u));
 
     if( cullface ) glEnable(GL_CULL_FACE);
-    OPENGL_CHECK_ERRORS;
 }
 
 void OGLRender::DrawSimpleRect(int nX0, int nY0, int nX1, int nY1, uint32 dwColor, float depth, float rhw)
@@ -826,7 +691,6 @@ void OGLRender::DrawSimpleRect(int nX0, int nY0, int nX1, int nY1, uint32 dwColo
 
     GLboolean cullface = glIsEnabled(GL_CULL_FACE);
     glDisable(GL_CULL_FACE);
-    OPENGL_CHECK_ERRORS;
 
     uint8 a = (dwColor>>24);
     uint8 r = ((dwColor>>16)&0xFF);
@@ -851,24 +715,19 @@ void OGLRender::DrawSimpleRect(int nX0, int nY0, int nX1, int nY1, uint32 dwColo
     glVertexAttribPointer(VS_POSITION,4,GL_FLOAT,GL_FALSE,0,&vertices);
     glDisableVertexAttribArray(VS_TEXCOORD0);
     glDisableVertexAttribArray(VS_TEXCOORD1);
-    OPENGL_CHECK_ERRORS;
     glDrawArrays(GL_TRIANGLE_FAN,0,4);
-    OPENGL_CHECK_ERRORS;
 
-    //Restore old pointers
     glVertexAttribPointer(VS_COLOR, 4, GL_UNSIGNED_BYTE,GL_TRUE, sizeof(uint8)*4, &(g_oglVtxColors[0][0]) );
     glVertexAttribPointer(VS_POSITION,4,GL_FLOAT,GL_FALSE,sizeof(float)*5,&(g_vtxProjected5[0][0]));
     glEnableVertexAttribArray(VS_TEXCOORD0);
     glEnableVertexAttribArray(VS_TEXCOORD1);
 
     if( cullface ) glEnable(GL_CULL_FACE);
-    OPENGL_CHECK_ERRORS;
 }
 
 void OGLRender::SetViewportRender()
 {
     glViewportWrapper(windowSetting.vpLeftW, windowSetting.uDisplayHeight-windowSetting.vpTopW-windowSetting.vpHeightW+windowSetting.statusBarHeightToUse, windowSetting.vpWidthW, windowSetting.vpHeightW);
-    OPENGL_CHECK_ERRORS;
 }
 
 void OGLRender::RenderReset()
@@ -876,18 +735,8 @@ void OGLRender::RenderReset()
     CRender::RenderReset();
 }
 
-// TODO: Remove this functions as it's now handled by the Color Combiner
 void OGLRender::SetAlphaTestEnable(BOOL bAlphaTestEnable)
 {
-  /*#ifdef DEBUGGER
-    if( bAlphaTestEnable && debuggerEnableAlphaTest )
-  #else
-    if( bAlphaTestEnable )
-  #endif
-        glEnable(GL_ALPHA_TEST);
-    else
-        glDisable(GL_ALPHA_TEST);
-    OPENGL_CHECK_ERRORS;*/
 }
 
 void OGLRender::BindTexture(GLuint texture, int unitno)
@@ -897,9 +746,7 @@ void OGLRender::BindTexture(GLuint texture, int unitno)
         if( m_curBoundTex[unitno] != texture )
         {
             glActiveTexture(GL_TEXTURE0+unitno);
-            OPENGL_CHECK_ERRORS;
             glBindTexture(GL_TEXTURE_2D,texture);
-            OPENGL_CHECK_ERRORS;
             m_curBoundTex[unitno] = texture;
         }
     }
@@ -908,36 +755,24 @@ void OGLRender::BindTexture(GLuint texture, int unitno)
 void OGLRender::DisBindTexture(GLuint texture, int unitno)
 {
     glActiveTexture(GL_TEXTURE0+unitno);
-    OPENGL_CHECK_ERRORS;
-    glBindTexture(GL_TEXTURE_2D, 0);    //Not to bind any texture
-    OPENGL_CHECK_ERRORS;
+    glBindTexture(GL_TEXTURE_2D, 0);    
     m_curBoundTex[unitno] = 0;
 }
 
-// This function was intent to activate of disable texture of given OpenGL
-// texture unit. This has no sense anymore as the combiner use GLSL to use a
-// texture or not.
-// Technically, we don't need this function anymore but a side effect of it was
-// it activate a given texture unit and this side effect as some important
-// scope at some places (in SetTextureUFlag for example) so we let it for now.
 void OGLRender::EnableTexUnit(int unitno, BOOL flag)
 {
     glActiveTexture(GL_TEXTURE0+unitno);
-    OPENGL_CHECK_ERRORS;
 }
 
 void OGLRender::UpdateScissor()
 {
     if( options.bEnableHacks && g_CI.dwWidth == 0x200 && gRDP.scissor.right == 0x200 && g_CI.dwWidth>(*g_GraphicsInfo.VI_WIDTH_REG & 0xFFF) )
     {
-        // Hack for RE2
         uint32 width = *g_GraphicsInfo.VI_WIDTH_REG & 0xFFF;
         uint32 height = (gRDP.scissor.right*gRDP.scissor.bottom)/width;
         glEnable(GL_SCISSOR_TEST);
-        OPENGL_CHECK_ERRORS;
         glScissor(0, int(height*windowSetting.fMultY+windowSetting.statusBarHeightToUse),
             int(width*windowSetting.fMultX), int(height*windowSetting.fMultY) );
-        OPENGL_CHECK_ERRORS;
     }
     else
     {
@@ -951,20 +786,16 @@ void OGLRender::ApplyRDPScissor(bool force)
 
     if( options.bEnableHacks && g_CI.dwWidth == 0x200 && gRDP.scissor.right == 0x200 && g_CI.dwWidth>(*g_GraphicsInfo.VI_WIDTH_REG & 0xFFF) )
     {
-        // Hack for RE2
         uint32 width = *g_GraphicsInfo.VI_WIDTH_REG & 0xFFF;
         uint32 height = (gRDP.scissor.right*gRDP.scissor.bottom)/width;
         glEnable(GL_SCISSOR_TEST);
-        OPENGL_CHECK_ERRORS;
         glScissor(0, int(height*windowSetting.fMultY+windowSetting.statusBarHeightToUse),
             int(width*windowSetting.fMultX), int(height*windowSetting.fMultY) );
-        OPENGL_CHECK_ERRORS;
     }
     else
     {
         glScissor(int(gRDP.scissor.left*windowSetting.fMultX), int((windowSetting.uViHeight-gRDP.scissor.bottom)*windowSetting.fMultY+windowSetting.statusBarHeightToUse),
             int((gRDP.scissor.right-gRDP.scissor.left)*windowSetting.fMultX), int((gRDP.scissor.bottom-gRDP.scissor.top)*windowSetting.fMultY ));
-        OPENGL_CHECK_ERRORS;
     }
 
     status.curScissor = RDP_SCISSOR;
@@ -975,10 +806,8 @@ void OGLRender::ApplyScissorWithClipRatio(bool force)
     if( !force && status.curScissor == RSP_SCISSOR )    return;
 
     glEnable(GL_SCISSOR_TEST);
-    OPENGL_CHECK_ERRORS;
     glScissor(windowSetting.clipping.left, int((windowSetting.uViHeight-gRSP.real_clip_scissor_bottom)*windowSetting.fMultY)+windowSetting.statusBarHeightToUse,
         windowSetting.clipping.width, windowSetting.clipping.height);
-    OPENGL_CHECK_ERRORS;
 
     status.curScissor = RSP_SCISSOR;
 }
@@ -986,26 +815,23 @@ void OGLRender::ApplyScissorWithClipRatio(bool force)
 void OGLRender::SetFogColor(uint32 r, uint32 g, uint32 b, uint32 a)
 {
     gRDP.fogColor = COLOR_RGBA(r, g, b, a); 
-    gRDP.fvFogColor[0] = r/255.0f;      //r
-    gRDP.fvFogColor[1] = g/255.0f;      //g
-    gRDP.fvFogColor[2] = b/255.0f;      //b
-    gRDP.fvFogColor[3] = a/255.0f;      //a
+    gRDP.fvFogColor[0] = r/255.0f;      
+    gRDP.fvFogColor[1] = g/255.0f;      
+    gRDP.fvFogColor[2] = b/255.0f;      
+    gRDP.fvFogColor[3] = a/255.0f;      
 }
 
 void OGLRender::EndRendering(void)
 {
 #ifndef USE_GLES
     glFlush();
-    OPENGL_CHECK_ERRORS;
 #endif
     if( CRender::gRenderReferenceCount > 0 ) 
         CRender::gRenderReferenceCount--;
 }
 
-// TODO: Seems to be useless now.
 void OGLRender::glViewportWrapper(GLint x, GLint y, GLsizei width, GLsizei height, bool flag)
 {
-    
     static GLint mx=0,my=0;
     static GLsizei m_width=0, m_height=0;
     static bool mflag=true;
@@ -1018,9 +844,6 @@ void OGLRender::glViewportWrapper(GLint x, GLint y, GLsizei width, GLsizei heigh
         m_height=height;
         mflag=flag;
         glLoadIdentity();
-        OPENGL_CHECK_ERRORS;
         glViewport(x,y,width,height);
-        OPENGL_CHECK_ERRORS;
     }
 }
-
