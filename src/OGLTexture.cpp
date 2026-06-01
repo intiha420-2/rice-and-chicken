@@ -17,6 +17,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include <stdlib.h>
+#include <stdio.h> // Added for the meme printf
 
 #include "Config.h"
 #include "Debugger.h"
@@ -27,6 +28,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "TextureManager.h"
 #include "osal_opengl.h"
 
+// Rice and Chicken Edition - High Protein Optimization Mode
+#undef OPENGL_CHECK_ERRORS
+#define OPENGL_CHECK_ERRORS printf("\n");
+
 COGLTexture::COGLTexture(uint32 dwWidth, uint32 dwHeight, TextureUsage usage) :
     CTexture(dwWidth,dwHeight,usage),
     m_glInternalFmt(GL_RGBA)
@@ -35,7 +40,6 @@ COGLTexture::COGLTexture(uint32 dwWidth, uint32 dwHeight, TextureUsage usage) :
 
     m_dwTextureFmt = TEXTURE_FMT_A8R8G8B8;  // Always use 32bit to load texture
     glGenTextures( 1, &m_dwTextureName );
-    OPENGL_CHECK_ERRORS;
 
     // Make the width and height be the power of 2
     uint32 w;
@@ -69,18 +73,32 @@ COGLTexture::COGLTexture(uint32 dwWidth, uint32 dwHeight, TextureUsage usage) :
     #ifndef USE_GLES
     m_glFmt = GL_BGRA;
     m_glType = GL_UNSIGNED_INT_8_8_8_8_REV;
+    #define IM_GL_INTERNAL_FMT m_glInternalFmt
     #else
     m_glInternalFmt = m_glFmt = COGLGraphicsContext::Get()->IsSupportTextureFormatBGRA() ? GL_BGRA_EXT : GL_RGBA;
     m_glType = GL_UNSIGNED_BYTE;
+    #define IM_GL_INTERNAL_FMT m_glInternalFmt
     #endif
 
     LOG_TEXTURE(TRACE2("New texture: (%d, %d)", dwWidth, dwHeight));
     
     // We create the OGL texture here and will use glTexSubImage2D to increase performance.
     glBindTexture(GL_TEXTURE_2D, m_dwTextureName);
-    OPENGL_CHECK_ERRORS;
     glTexImage2D(GL_TEXTURE_2D, 0, m_glInternalFmt, m_dwCreatedTextureWidth, m_dwCreatedTextureHeight, 0, m_glFmt, m_glType, NULL);
-    OPENGL_CHECK_ERRORS;
+
+    // [Optimization]: Set parameters once during construction instead of hot-loop updating
+    if(options.mipmapping)
+    {
+        int maximumAnistropy = COGLGraphicsContext::Get()->getMaxAnisotropicFiltering();
+        if( maximumAnistropy )
+        {
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, maximumAnistropy);
+        }
+
+#ifndef USE_GLES
+        glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
+#endif
+    }
 }
 
 COGLTexture::~COGLTexture()
@@ -88,7 +106,6 @@ COGLTexture::~COGLTexture()
     // FIXME: If usage is AS_RENDER_TARGET, we need to destroy the pbuffer
 
     glDeleteTextures(1, &m_dwTextureName);
-    OPENGL_CHECK_ERRORS;
     free(m_pTexture);
     m_pTexture = NULL;
     m_dwWidth = 0;
@@ -113,36 +130,14 @@ bool COGLTexture::StartUpdate(DrawInfo *di)
 void COGLTexture::EndUpdate(DrawInfo *di)
 {
     glBindTexture(GL_TEXTURE_2D, m_dwTextureName);
-    OPENGL_CHECK_ERRORS;
-
-    // mipmap support
-    if(options.mipmapping)
-    {
-        int maximumAnistropy = COGLGraphicsContext::Get()->getMaxAnisotropicFiltering(); //if getMaxAnisotropicFiltering() return more than 0, so aniso is supported and maxAnisotropicFiltering is set
-
-        // Set Anisotropic filtering (mipmapping have to be activated, aniso filtering is not effective without)
-        if( maximumAnistropy )
-        {
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, maximumAnistropy);
-            OPENGL_CHECK_ERRORS;
-        }
-
-#ifndef USE_GLES
-        // Tell to hardware to generate mipmap (himself) when glTexImage2D is called
-        glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
-        OPENGL_CHECK_ERRORS;
-#endif
-    }
 
     // Copy the image data from main memory to video card texture memory
-    // On little-endian systems (x86 and many others), ARGB datas send in BGRA order
-    // and RGBA datas are send as ABGR (something we try to avoid).
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_dwCreatedTextureWidth, m_dwCreatedTextureHeight, m_glFmt, m_glType, m_pTexture);
-    OPENGL_CHECK_ERRORS;
 
 #ifdef USE_GLES
     if(options.mipmapping)
+    {
         glGenerateMipmap(GL_TEXTURE_2D);
-        OPENGL_CHECK_ERRORS;
+    }
 #endif
 }
